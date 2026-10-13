@@ -1,0 +1,87 @@
+@startuml to-be-hld
+!pragma layout smetana
+!include <C4/C4_Container>
+
+AddElementTag("device", $bgColor="#8a8a8a", $borderColor="#5a5a5a", $legendText="устройство")
+AddElementTag("hal", $bgColor="#ff7f0e", $borderColor="#b35900", $legendText="слой абстракции HAL / Gateway")
+AddRelTag("async", $lineStyle=DashedLine(), $legendText="асинхронно / события")
+
+LAYOUT_TOP_DOWN()
+
+title To-Be: Cloud POS VitaStore (High-Level Design, C4 Containers)
+
+Person(cashier, "Кассир", "Работает на планшете")
+
+System_Boundary(store, "Store Edge: магазин (сервера нет)") {
+  Boundary(tablet, "Android-планшет кассы (MDM)") {
+    Container(webpos, "Web POS", "PWA, TypeScript, Service Worker", "UI и сценарии кассы; не знает моделей устройств")
+    Boundary(agent, "Edge Agent (Android foreground service)") {
+      Container(hal, "HAL + Local API", "Kotlin, плагины, WebSocket 127.0.0.1", "IFiscalPrinter, IPaymentTerminal; плагины АТОЛ, Штрих-М, ARCUS-2, Альфа, Ingenico, Verifone", $tags="hal")
+      Container(offline_engine, "Offline Engine", "Kotlin", "Расчёт чека по кэшу: цены, базовые промо, лимит лояльности")
+      ContainerDb(offline_store, "Offline Store", "SQLite", "Кэш справочников, цен, промо, балансов; outbox чеков и событий")
+      Container(sync_agent, "Sync Agent", "Kotlin", "Дельты справочников, отправка outbox, heartbeat")
+    }
+  }
+  Container_Ext(kkt, "ККТ с ФН", "АТОЛ / Штрих-М, USB", "Печать и хранение фискальных документов", $tags="device")
+  Container_Ext(pinpad, "PIN-pad", "Сбер, Альфа, Ingenico, Verifone; USB / BT / TCP", "Ввод PIN, авторизация через канал банка", $tags="device")
+  Container_Ext(router, "Роутер", "Проводной канал + LTE-резерв", "Связь с облаком", $tags="device")
+}
+
+System_Boundary(yc, "Yandex Cloud: Cloud Backend") {
+  Container(cdn, "Статика Web POS", "Object Storage + Cloud CDN", "Версии PWA")
+  Container(apigw, "API Gateway", "Yandex API Gateway", "Аутентификация устройств, маршрутизация, лимиты")
+  Container(checkout, "Checkout Service", "Managed Kubernetes", "Расчёт чека: цены, промо, лояльность; смены, продажи")
+  Container(catalog, "Catalog & Price Service", "Managed Kubernetes", "Ассортимент и цены магазина из 1С, версии справочников")
+  Container(stock, "Stock Service", "Managed Kubernetes", "Остатки магазина почти в реальном времени")
+  Container(sync, "Sync Service", "Managed Kubernetes", "Приём outbox, дедупликация, выдача дельт")
+  Container(registry, "Device Registry", "Managed Kubernetes", "Планшеты, ККТ, терминалы, профили плагинов, токены")
+  Container(paygw, "Payment Gateway", "Managed Kubernetes", "Единый Payment API, маршрутизация к эквайрерам, СБП, сверка", $tags="hal")
+  ContainerDb(posdb, "POS DB", "Managed PostgreSQL", "Чеки, смены, справочники магазинов")
+  ContainerQueue(kafka, "Event Bus", "Managed Kafka", "Чеки, остатки, цены, ассортимент")
+}
+
+System(erp, "1С:ERP", "Эталон номенклатуры, цен, учёт (Yandex Cloud)")
+System(promo, "Promo Engine", "Правила промо")
+System(sf, "Smart Fulfillment", "Click & Collect")
+System(onb, "Оркестратор онбординга", "Task2: публикация ассортимента")
+System_Ext(loyalty, "Loyalty SaaS", "Manzana / Mindbox / Loymax")
+System_Ext(ofd, "ОФД", "54-ФЗ")
+System_Ext(acq, "Эквайреры", "Сбер, Альфа и др.; СБП")
+System_Ext(mdm, "MDM", "Установка и обновление Edge Agent")
+
+Rel(cashier, webpos, "Продажа, возврат, смена")
+Rel(webpos, hal, "fiscal.*, payment.*, offline.*", "WebSocket localhost")
+Rel(hal, kkt, "Чек, отчёты", "Плагин АТОЛ / Штрих-М")
+Rel(hal, pinpad, "Оплата, возврат", "Плагин вендора")
+Rel(hal, offline_engine, "Расчёт чека без связи")
+Rel(offline_engine, offline_store, "Читает кэш, пишет outbox")
+Rel(sync_agent, offline_store, "Обновляет кэш, читает outbox")
+Rel(webpos, cdn, "Загружает PWA", "HTTPS")
+Rel(webpos, apigw, "Онлайн-сценарии кассы", "HTTPS")
+Rel(sync_agent, apigw, "Outbox и дельты", "HTTPS", $tags="async")
+Rel(kkt, router, "Документы в ОФД")
+Rel(router, ofd, "Фискальные документы", "Интернет")
+Rel(pinpad, acq, "Авторизация", "Канал банка")
+
+Rel(apigw, checkout, "")
+Rel(apigw, paygw, "")
+Rel(apigw, sync, "")
+Rel(apigw, registry, "")
+Rel(checkout, catalog, "Цены")
+Rel(checkout, loyalty, "Начисление / списание", "REST")
+Rel(checkout, posdb, "")
+Rel(sync, posdb, "Идемпотентная запись")
+Rel(checkout, kafka, "Чеки", "", $tags="async")
+Rel(sync, kafka, "Офлайн-чеки", "", $tags="async")
+Rel(kafka, stock, "Продажи", "", $tags="async")
+Rel(paygw, acq, "Маршрутизация, СБП, реестры", "API банков")
+Rel(erp, kafka, "Цены, ассортимент", "", $tags="async")
+Rel(kafka, erp, "Продажи, остатки", "", $tags="async")
+Rel(kafka, catalog, "Изменения справочников", "", $tags="async")
+Rel(promo, checkout, "Правила промо", "API")
+Rel(sf, stock, "Остатки для заказов", "API")
+Rel(onb, erp, "Ассортимент нового магазина")
+Rel(mdm, agent, "Установка, обновление плагинов")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,55 @@
+@startuml offline-sync
+!pragma layout smetana
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+
+title Офлайн-продажа и синхронизация после восстановления связи
+
+actor "Кассир" as cashier
+participant "Web POS\n(PWA)" as pos
+box "Edge Agent" #FFF3E0
+  participant "HAL" as hal
+  participant "Offline Engine" as eng
+  database "Offline Store\n(кэш + outbox)" as store
+  participant "Sync Agent" as agent
+end box
+participant "ККТ с ФН" as kkt
+box "Yandex Cloud" #E3F2FD
+  participant "Sync Service" as sync
+  queue "Event Bus\n(Kafka)" as bus
+end box
+participant "Stock / 1С:ERP /\nLoyalty SaaS" as consumers
+participant "ОФД" as ofd
+
+== Связь потеряна ==
+agent -> sync : heartbeat
+agent <--x sync : тайм-аут
+agent -> pos : статус OFFLINE
+pos -> cashier : баннер «Офлайн: наличные, лояльность в лимите»
+
+== Продажа за наличные ==
+cashier -> pos : товары, карта лояльности, наличные
+pos -> eng : offline.calculate(корзина, карта)
+eng -> store : цены и промо версии N, баланс карты
+eng -> store : outbox: черновик {receiptId=UUID, deviceSeq=1042, priceVersion=N}
+eng --> pos : сумма, скидка, списание в пределах лимита
+pos -> hal : fiscal.printReceipt(receiptId)
+hal -> kkt : печать чека
+kkt --> hal : ФД, ФПД (документ в ФН)
+hal -> store : outbox: чек подтверждён {ФД/ФПД, начисление отложено}
+hal --> pos : чек напечатан
+
+== Связь восстановлена ==
+kkt -> ofd : накопленные фискальные документы (сама ККТ)
+agent -> sync : heartbeat OK
+agent -> sync : push outbox пачками по deviceSeq
+sync -> sync : upsert по receiptId (повтор = no-op)
+sync --> agent : ack до deviceSeq=1042
+agent -> store : пометить отправленным
+sync -> bus : ReceiptRegistered (origin=offline)
+bus -> consumers : остатки, проводки, отложенные баллы
+agent -> sync : pull дельт справочников с версии N
+sync --> agent : цены и промо версии N+k, балансы карт
+agent -> store : применить дельты
+agent -> pos : статус ONLINE
+@enduml

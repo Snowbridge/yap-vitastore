@@ -1,0 +1,56 @@
+@startuml as-is-containers
+!pragma layout smetana
+!include <C4/C4_Container>
+
+AddElementTag("device", $bgColor="#8a8a8a", $borderColor="#5a5a5a", $legendText="устройство")
+AddElementTag("pain", $borderColor="#d62728", $legendText="точка отказа / ручной труд")
+AddRelTag("night", $textColor="#d62728", $lineColor="#d62728", $lineStyle=DashedLine(), $legendText="ночной пакетный обмен")
+
+LAYOUT_TOP_DOWN()
+
+title As-Is: кассовая зона VitaStore (C4 Containers, исправленный Артефакт 1)
+
+Person(cashier, "Кассир", "Сотрудник магазина")
+Person(merch, "Товаровед HQ", "Сопоставление номенклатуры, VLOOKUP")
+
+System_Boundary(store, "Собственный магазин (x500, одинаково в каждом)") {
+  Container(pos_app, "POS App (толстый клиент)", "Windows, C#", "Монолит: UI, расчёт чека, промо, драйверы ККТ и терминала")
+  Container(backoffice, "Back-office", "Windows, desktop", "Товарный учёт, приёмка, ценники, премии, лояльность «в тетрадке»")
+  ContainerDb(local_db, "Local DB", "MS SQL Server / PostgreSQL", "Сервер в подсобке (Windows Server): справочники, цены, остатки, чеки", $tags="pain")
+  Container(importer, "Обмен с HQ", "Планировщик + FTP-клиент", "02:00: загрузка прайс-листов XML, выгрузка продаж за день")
+  Container_Ext(kkt, "ККТ с ФН", "COM-port", "Модель зависит от магазина", $tags="device")
+  Container_Ext(pinpad, "Банковский терминал", "USB / COM", "Ingenico, у купленных — Сбер (ARCUS-2), Альфа, Verifone", $tags="device")
+}
+
+System_Boundary(hq, "Центральный офис (HQ Cloud)") {
+  Container(sap, "SAP ERP", "SAP", "Учёт товаров, цен, кадров, финансов", $tags="pain")
+  Container(ftp, "FTP-сервер обмена", "FTP", "Пакеты XML для 500+ магазинов")
+  Container(loyalty_api, "Loyalty API (пилот)", "REST", "Онлайн-проверка карт, нет офлайн-режима (INC-8402)", $tags="pain")
+  Container(promo, "Promo Engine", "Собственная разработка", "Правила промоакций")
+  Container(sf, "Smart Fulfillment", "Собственная разработка", "Омниканальная логистика, Click & Collect")
+  Container(mail, "Почтовый ящик data-integration@", "Email", "Приём выгрузок CSV/XLS от выездного инженера", $tags="pain")
+}
+
+System_Ext(ofd, "ОФД", "Передача чеков в ФНС (54-ФЗ)")
+System_Ext(bank, "Процессинг банка-эквайрера", "Авторизация карт")
+
+Rel(cashier, pos_app, "Пробивает чеки", "UI")
+Rel(cashier, backoffice, "Приёмка, ценники", "UI")
+Rel(pos_app, local_db, "Читает цены, пишет чеки", "SQL, синхронно")
+Rel(backoffice, local_db, "Читает и пишет", "SQL")
+Rel(pos_app, kkt, "Печать чека", "Драйвер в коде кассы")
+Rel(pos_app, pinpad, "Оплата картой", "Драйвер в коде кассы")
+Rel(pos_app, loyalty_api, "Проверка карты", "REST, тайм-аут при офлайне")
+Rel(kkt, ofd, "Фискальные документы", "Интернет магазина")
+Rel(pinpad, bank, "Авторизация", "Канал банка")
+Rel(importer, local_db, "Загружает справочники, выгружает продажи")
+Rel(importer, ftp, "Забирает и отправляет пакеты", "FTP, 02:00", $tags="night")
+Rel(sap, ftp, "Прайс-листы и номенклатура", "XML, 02:00", $tags="night")
+Rel(ftp, sap, "Продажи и остатки за день", "XML", $tags="night")
+Rel(promo, sap, "Правила промо в пакет магазина", "Пакетно")
+Rel(sap, sf, "Остатки магазинов", "Раз в сутки", $tags="night")
+Rel(merch, mail, "Получает выгрузки")
+Rel(merch, sap, "Загружает сведённую номенклатуру", "Excel")
+
+SHOW_LEGEND()
+@enduml
