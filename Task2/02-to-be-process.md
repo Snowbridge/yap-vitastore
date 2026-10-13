@@ -99,13 +99,3 @@
 | Календарный срок переноса номенклатуры | 2-3 недели (очередь, выезд, ночное окно, исправления) | 1-2 рабочих дня внутри 5-дневного окна онбординга |
 
 При потоке 10 магазинов в месяц ручная нагрузка падает примерно со 160 до 50 чел.-часов в месяц. Отдел Data Integration справляется с потоком без расширения штата. Деньги — в Task4.
-
-## 7. Пересборка PNG
-
-Из каталога `Task2` (Chromium для Puppeteer можно заменить установленным Chrome):
-
-```bash
-PUPPETEER_EXECUTABLE_PATH="C:/Program Files/Google/Chrome/Application/chrome.exe" \
-  npx bpmn-to-image --no-footer --min-dimensions=4800x1750 \
-  "onboarding-sku-matching.bpmn;onboarding-sku-matching.png"
-```
