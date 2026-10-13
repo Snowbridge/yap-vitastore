@@ -19,13 +19,6 @@
 | [adr/ADR-009-training-price-assumptions.md](adr/ADR-009-training-price-assumptions.md) | Учебные цены и порядок получения реальных цен в боевом проекте |
 | [adr/ADR-010-tco-perimeter-and-allocation.md](adr/ADR-010-tco-perimeter-and-allocation.md) | Периметр, распределение общих затрат, онбординг, график перехода, финансовые метрики |
 
-Пересборка (из каталога `Task4`, Python 3.10+, без зависимостей):
-
-```bash
-python tco_model.py                         # таблицы в 02-tco-analysis.md и break-even.svg
-python tco_model.py --scenario full-capex   # один сценарий чувствительности в консоль
-```
-
 Используются решения Task1-3: [ADR-001](../Task1/adr/ADR-001-hq-in-cloud.md) (Yandex Cloud), [ADR-002](../Task1/adr/ADR-002-scope-all-stores.md) (в магазине только физика), [ADR-004](../Task2/adr/ADR-004-onboarding-scope-and-channel.md) (удалённый онбординг), [ADR-006](../Task3/adr/ADR-006-own-cloud-pos.md) (собственный Cloud POS: в Task4 — разработка и PaaS вместо подписки), [ADR-007](../Task3/adr/ADR-007-edge-agent-hal.md) (планшет, замена ККТ), [ADR-008](../Task3/adr/ADR-008-offline-mode.md) (LTE-резерв и офлайн), трудозатраты маппинга из [Task2](../Task2/README.md).
 
 ## Реестр разрывов и противоречий в постановке
