@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Defs_Onboarding" targetNamespace="http://vitastore.ru/bpmn/onboarding" exporter="handwritten" exporterVersion="1.0">
+  <bpmn:collaboration id="Collab_Onboarding">
+    <bpmn:participant id="Pool_AI" name="AI-сервис SKU Matching" processRef="Process_AI" />
+    <bpmn:participant id="Pool_Main" name="Перенос номенклатуры: оркестратор и люди" processRef="Process_Main" />
+    <bpmn:participant id="Pool_ERP" name="1С:ERP" processRef="Process_ERP" />
+    <bpmn:participant id="Pool_POS" name="Cloud POS (кассовый SaaS)" />
+    <bpmn:messageFlow id="Msg_Request" name="Позиции выгрузки" sourceRef="Task_CallAI" targetRef="AI_Start" />
+    <bpmn:messageFlow id="Msg_Result" name="Топ-3 кандидата, confidence, риск-флаги" sourceRef="AI_End" targetRef="Task_CallAI" />
+    <bpmn:messageFlow id="Msg_To1C" name="Таблица соответствий, новые карточки, остатки" sourceRef="Task_Send1C" targetRef="ERP_Start" />
+    <bpmn:messageFlow id="Msg_ToPOS" name="Событие: ассортимент и цены магазина (Kafka)" sourceRef="ERP_End" targetRef="Pool_POS" />
+    <bpmn:messageFlow id="Msg_POSAck" name="Ассортимент загружен" sourceRef="Pool_POS" targetRef="Catch_POS" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Main" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Main">
+      <bpmn:lane id="Lane_Store" name="Управляющий магазином (купленная сеть)">
+        <bpmn:flowNodeRef>Task_Upload</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Smoke</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Orch" name="Оркестратор онбординга (автоматически)">
+        <bpmn:flowNodeRef>Start_Deal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CreateCase</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Validate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Valid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CallAI</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Split</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ApplyAuto</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SaveLabels</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Send1C</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Catch_POS</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Smoke</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Ready</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Merch" name="Товаровед HQ">
+        <bpmn:flowNodeRef>Task_Audit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Audit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ConfirmMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Confirm</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Rejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ManualMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Manual</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Found</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_CM" name="Категорийный менеджер HQ">
+        <bpmn:flowNodeRef>Task_CM</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Deal" name="Сделка закрыта, магазин в плане онбординга">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Start_Deal_Msg" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_CreateCase" name="Создать кейс онбординга и выдать доступ к порталу">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Task_Upload" name="Загрузить выгрузку товаров и остатков на портал (или дать доступ к БД/API)">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_Export"><bpmn:targetRef>Data_Export</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:dataObject id="Data_Export_Obj" />
+    <bpmn:dataObjectReference id="Data_Export" name="Выгрузка товаров и остатков (CSV/XLS/API)" dataObjectRef="Data_Export_Obj" />
+    <bpmn:serviceTask id="Task_Validate" name="Проверить выгрузку: схема, дубли, контрольная сумма EAN">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:property id="DIA_Export_Prop" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Export"><bpmn:sourceRef>Data_Export</bpmn:sourceRef><bpmn:targetRef>DIA_Export_Prop</bpmn:targetRef></bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Valid" name="Выгрузка корректна?">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_CallAI" name="Запустить AI-маппинг номенклатуры">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:inclusiveGateway id="Gw_Split" name="Коридор уверенности">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:inclusiveGateway>
+    <bpmn:serviceTask id="Task_ApplyAuto" name="Применить автоматические соответствия">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Task_Audit" name="Выборочный аудит 3% автосоответствий (не меньше 50)">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Audit" name="Ошибок больше 1%?">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_ConfirmMerge" name="">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:incoming>Flow_30</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_Confirm" name="Подтвердить соответствие: выбрать из топ-3 кандидатов">
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics />
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Rejected" name="Все кандидаты отклонены?">
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_ManualMerge" name="">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_Manual" name="Ручной разбор: найти аналог в справочнике 1С">
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics />
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Found" name="Аналог найден?">
+      <bpmn:incoming>Flow_20</bpmn:incoming>
+      <bpmn:outgoing>Flow_21</bpmn:outgoing>
+      <bpmn:outgoing>Flow_22</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_CM" name="Решить: новая карточка (черновик от ИИ) или вывод из ассортимента">
+      <bpmn:incoming>Flow_22</bpmn:incoming>
+      <bpmn:outgoing>Flow_23</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics />
+    </bpmn:userTask>
+    <bpmn:inclusiveGateway id="Gw_Join" name="">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:incoming>Flow_21</bpmn:incoming>
+      <bpmn:incoming>Flow_23</bpmn:incoming>
+      <bpmn:outgoing>Flow_24</bpmn:outgoing>
+    </bpmn:inclusiveGateway>
+    <bpmn:serviceTask id="Task_SaveLabels" name="Сохранить решения людей в обучающую выборку">
+      <bpmn:incoming>Flow_24</bpmn:incoming>
+      <bpmn:outgoing>Flow_25</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DOA_Labels"><bpmn:targetRef>Store_Labels</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:dataStoreReference id="Store_Labels" name="Обучающая выборка: синонимы и разметка" />
+    <bpmn:sendTask id="Task_Send1C" name="Передать в 1С соответствия, новые карточки и остатки">
+      <bpmn:incoming>Flow_25</bpmn:incoming>
+      <bpmn:outgoing>Flow_26</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:intermediateCatchEvent id="Catch_POS" name="Cloud POS загрузил ассортимент">
+      <bpmn:incoming>Flow_26</bpmn:incoming>
+      <bpmn:outgoing>Flow_27</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Catch_POS_Msg" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="Task_Smoke" name="Пробная продажа контрольной выборки ~100 SKU (тестовый чек)">
+      <bpmn:incoming>Flow_27</bpmn:incoming>
+      <bpmn:outgoing>Flow_28</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Smoke" name="Есть расхождения?">
+      <bpmn:incoming>Flow_28</bpmn:incoming>
+      <bpmn:outgoing>Flow_29</bpmn:outgoing>
+      <bpmn:outgoing>Flow_30</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_Ready" name="Номенклатура готова к открытию">
+      <bpmn:incoming>Flow_29</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" name="" sourceRef="Start_Deal" targetRef="Task_CreateCase" />
+    <bpmn:sequenceFlow id="Flow_2" name="" sourceRef="Task_CreateCase" targetRef="Task_Upload" />
+    <bpmn:sequenceFlow id="Flow_3" name="" sourceRef="Task_Upload" targetRef="Task_Validate" />
+    <bpmn:sequenceFlow id="Flow_4" name="" sourceRef="Task_Validate" targetRef="Gw_Valid" />
+    <bpmn:sequenceFlow id="Flow_5" name="да" sourceRef="Gw_Valid" targetRef="Task_CallAI" />
+    <bpmn:sequenceFlow id="Flow_6" name="нет, отчёт об ошибках" sourceRef="Gw_Valid" targetRef="Task_Upload" />
+    <bpmn:sequenceFlow id="Flow_7" name="" sourceRef="Task_CallAI" targetRef="Gw_Split" />
+    <bpmn:sequenceFlow id="Flow_8" name="от 95%, без флагов" sourceRef="Gw_Split" targetRef="Task_ApplyAuto" />
+    <bpmn:sequenceFlow id="Flow_9" name="70-95% или риск-флаг" sourceRef="Gw_Split" targetRef="Gw_ConfirmMerge" />
+    <bpmn:sequenceFlow id="Flow_10" name="меньше 70%" sourceRef="Gw_Split" targetRef="Gw_ManualMerge" />
+    <bpmn:sequenceFlow id="Flow_11" name="" sourceRef="Task_ApplyAuto" targetRef="Task_Audit" />
+    <bpmn:sequenceFlow id="Flow_12" name="" sourceRef="Task_Audit" targetRef="Gw_Audit" />
+    <bpmn:sequenceFlow id="Flow_13" name="нет" sourceRef="Gw_Audit" targetRef="Gw_Join" />
+    <bpmn:sequenceFlow id="Flow_14" name="да: весь автокоридор на проверку" sourceRef="Gw_Audit" targetRef="Gw_ConfirmMerge" />
+    <bpmn:sequenceFlow id="Flow_15" name="" sourceRef="Gw_ConfirmMerge" targetRef="Task_Confirm" />
+    <bpmn:sequenceFlow id="Flow_16" name="" sourceRef="Task_Confirm" targetRef="Gw_Rejected" />
+    <bpmn:sequenceFlow id="Flow_17" name="нет" sourceRef="Gw_Rejected" targetRef="Gw_Join" />
+    <bpmn:sequenceFlow id="Flow_18" name="да" sourceRef="Gw_Rejected" targetRef="Gw_ManualMerge" />
+    <bpmn:sequenceFlow id="Flow_19" name="" sourceRef="Gw_ManualMerge" targetRef="Task_Manual" />
+    <bpmn:sequenceFlow id="Flow_20" name="" sourceRef="Task_Manual" targetRef="Gw_Found" />
+    <bpmn:sequenceFlow id="Flow_21" name="да" sourceRef="Gw_Found" targetRef="Gw_Join" />
+    <bpmn:sequenceFlow id="Flow_22" name="нет" sourceRef="Gw_Found" targetRef="Task_CM" />
+    <bpmn:sequenceFlow id="Flow_23" name="" sourceRef="Task_CM" targetRef="Gw_Join" />
+    <bpmn:sequenceFlow id="Flow_24" name="" sourceRef="Gw_Join" targetRef="Task_SaveLabels" />
+    <bpmn:sequenceFlow id="Flow_25" name="" sourceRef="Task_SaveLabels" targetRef="Task_Send1C" />
+    <bpmn:sequenceFlow id="Flow_26" name="" sourceRef="Task_Send1C" targetRef="Catch_POS" />
+    <bpmn:sequenceFlow id="Flow_27" name="" sourceRef="Catch_POS" targetRef="Task_Smoke" />
+    <bpmn:sequenceFlow id="Flow_28" name="" sourceRef="Task_Smoke" targetRef="Gw_Smoke" />
+    <bpmn:sequenceFlow id="Flow_29" name="нет" sourceRef="Gw_Smoke" targetRef="End_Ready" />
+    <bpmn:sequenceFlow id="Flow_30" name="да: позиции на повторную проверку" sourceRef="Gw_Smoke" targetRef="Gw_ConfirmMerge" />
+  </bpmn:process>
+  <bpmn:process id="Process_AI" isExecutable="false">
+    <bpmn:startEvent id="AI_Start" name="Запрос на маппинг">
+      <bpmn:outgoing>Flow_31</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="AI_Start_Msg" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="AI_GTIN" name="Точное совпадение по GTIN (штрихкоду)">
+      <bpmn:incoming>Flow_31</bpmn:incoming>
+      <bpmn:outgoing>Flow_32</bpmn:outgoing>
+      <bpmn:property id="DIA_IndexGTIN_Prop" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_IndexGTIN"><bpmn:sourceRef>Store_Index</bpmn:sourceRef><bpmn:targetRef>DIA_IndexGTIN_Prop</bpmn:targetRef></bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="AI_Normalize" name="Нормализация названий (YandexGPT): сокращения, бренд, объём">
+      <bpmn:incoming>Flow_32</bpmn:incoming>
+      <bpmn:outgoing>Flow_33</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="AI_Vector" name="Векторный поиск top-K по эмбеддингам">
+      <bpmn:incoming>Flow_33</bpmn:incoming>
+      <bpmn:outgoing>Flow_34</bpmn:outgoing>
+      <bpmn:property id="DIA_IndexVector_Prop" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_IndexVector"><bpmn:sourceRef>Store_Index</bpmn:sourceRef><bpmn:targetRef>DIA_IndexVector_Prop</bpmn:targetRef></bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="AI_Rerank" name="Переранжирование кандидатов (LLM), расчёт confidence">
+      <bpmn:incoming>Flow_34</bpmn:incoming>
+      <bpmn:outgoing>Flow_35</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="AI_Risk" name="Риск-правила: цена, категория, штрихкод, объём, маркировка">
+      <bpmn:incoming>Flow_35</bpmn:incoming>
+      <bpmn:outgoing>Flow_36</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:endEvent id="AI_End" name="Результаты маппинга">
+      <bpmn:incoming>Flow_36</bpmn:incoming>
+      <bpmn:messageEventDefinition id="AI_End_Msg" />
+    </bpmn:endEvent>
+    <bpmn:dataStoreReference id="Store_Index" name="Индекс номенклатуры VitaStore (pgvector, из 1С)" />
+    <bpmn:sequenceFlow id="Flow_31" name="" sourceRef="AI_Start" targetRef="AI_GTIN" />
+    <bpmn:sequenceFlow id="Flow_32" name="" sourceRef="AI_GTIN" targetRef="AI_Normalize" />
+    <bpmn:sequenceFlow id="Flow_33" name="" sourceRef="AI_Normalize" targetRef="AI_Vector" />
+    <bpmn:sequenceFlow id="Flow_34" name="" sourceRef="AI_Vector" targetRef="AI_Rerank" />
+    <bpmn:sequenceFlow id="Flow_35" name="" sourceRef="AI_Rerank" targetRef="AI_Risk" />
+    <bpmn:sequenceFlow id="Flow_36" name="" sourceRef="AI_Risk" targetRef="AI_End" />
+  </bpmn:process>
+  <bpmn:process id="Process_ERP" isExecutable="false">
+    <bpmn:startEvent id="ERP_Start" name="Пакет соответствий получен">
+      <bpmn:outgoing>Flow_37</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="ERP_Start_Msg" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="ERP_Load" name="Загрузить соответствия штрихкодов и новые карточки">
+      <bpmn:incoming>Flow_37</bpmn:incoming>
+      <bpmn:outgoing>Flow_38</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ERP_Stock" name="Ввести начальные остатки магазина">
+      <bpmn:incoming>Flow_38</bpmn:incoming>
+      <bpmn:outgoing>Flow_39</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ERP_Matrix" name="Сформировать ассортиментную матрицу и цены (прайс VitaStore, Promo Engine)">
+      <bpmn:incoming>Flow_39</bpmn:incoming>
+      <bpmn:outgoing>Flow_40</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="ERP_End" name="Ассортимент опубликован в шину">
+      <bpmn:incoming>Flow_40</bpmn:incoming>
+      <bpmn:messageEventDefinition id="ERP_End_Msg" />
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_37" name="" sourceRef="ERP_Start" targetRef="ERP_Load" />
+    <bpmn:sequenceFlow id="Flow_38" name="" sourceRef="ERP_Load" targetRef="ERP_Stock" />
+    <bpmn:sequenceFlow id="Flow_39" name="" sourceRef="ERP_Stock" targetRef="ERP_Matrix" />
+    <bpmn:sequenceFlow id="Flow_40" name="" sourceRef="ERP_Matrix" targetRef="ERP_End" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Onboarding">
+    <bpmndi:BPMNPlane id="Plane_Onboarding" bpmnElement="Collab_Onboarding">
+      <bpmndi:BPMNShape id="Pool_AI_di" bpmnElement="Pool_AI" isHorizontal="true"><dc:Bounds x="1000" y="120" width="1290" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Pool_Main_di" bpmnElement="Pool_Main" isHorizontal="true"><dc:Bounds x="100" y="360" width="4550" height="950" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Pool_ERP_di" bpmnElement="Pool_ERP" isHorizontal="true"><dc:Bounds x="3520" y="1370" width="1110" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Pool_POS_di" bpmnElement="Pool_POS" isHorizontal="true"><dc:Bounds x="100" y="1610" width="4550" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Store_di" bpmnElement="Lane_Store" isHorizontal="true"><dc:Bounds x="130" y="360" width="4520" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Orch_di" bpmnElement="Lane_Orch" isHorizontal="true"><dc:Bounds x="130" y="540" width="4520" height="200" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Merch_di" bpmnElement="Lane_Merch" isHorizontal="true"><dc:Bounds x="130" y="740" width="4520" height="410" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_CM_di" bpmnElement="Lane_CM" isHorizontal="true"><dc:Bounds x="130" y="1150" width="4520" height="160" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Deal_di" bpmnElement="Start_Deal"><dc:Bounds x="202" y="622" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="160" y="663" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreateCase_di" bpmnElement="Task_CreateCase"><dc:Bounds x="330" y="590" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Upload_di" bpmnElement="Task_Upload"><dc:Bounds x="510" y="400" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Data_Export_di" bpmnElement="Data_Export"><dc:Bounds x="742" y="405" width="36" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="784" y="410" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Validate_di" bpmnElement="Task_Validate"><dc:Bounds x="690" y="590" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Valid_di" bpmnElement="Gw_Valid" isMarkerVisible="true"><dc:Bounds x="915" y="615" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="880" y="670" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CallAI_di" bpmnElement="Task_CallAI"><dc:Bounds x="1050" y="590" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Split_di" bpmnElement="Gw_Split"><dc:Bounds x="1275" y="615" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1240" y="670" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ApplyAuto_di" bpmnElement="Task_ApplyAuto"><dc:Bounds x="1410" y="590" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Audit_di" bpmnElement="Task_Audit"><dc:Bounds x="1590" y="765" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Audit_di" bpmnElement="Gw_Audit" isMarkerVisible="true"><dc:Bounds x="1815" y="790" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1780" y="845" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ConfirmMerge_di" bpmnElement="Gw_ConfirmMerge" isMarkerVisible="true"><dc:Bounds x="1995" y="920" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Confirm_di" bpmnElement="Task_Confirm"><dc:Bounds x="2130" y="895" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Rejected_di" bpmnElement="Gw_Rejected" isMarkerVisible="true"><dc:Bounds x="2355" y="920" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="2320" y="975" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ManualMerge_di" bpmnElement="Gw_ManualMerge" isMarkerVisible="true"><dc:Bounds x="2535" y="1050" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Manual_di" bpmnElement="Task_Manual"><dc:Bounds x="2670" y="1025" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Found_di" bpmnElement="Gw_Found" isMarkerVisible="true"><dc:Bounds x="2895" y="1050" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="2860" y="1105" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CM_di" bpmnElement="Task_CM"><dc:Bounds x="3030" y="1180" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Join_di" bpmnElement="Gw_Join"><dc:Bounds x="3255" y="615" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SaveLabels_di" bpmnElement="Task_SaveLabels"><dc:Bounds x="3390" y="590" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Store_Labels_di" bpmnElement="Store_Labels"><dc:Bounds x="3435" y="35" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="3400" y="90" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Send1C_di" bpmnElement="Task_Send1C"><dc:Bounds x="3570" y="590" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_POS_di" bpmnElement="Catch_POS"><dc:Bounds x="3802" y="622" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="3760" y="663" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Smoke_di" bpmnElement="Task_Smoke"><dc:Bounds x="3930" y="400" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Smoke_di" bpmnElement="Gw_Smoke" isMarkerVisible="true"><dc:Bounds x="4155" y="615" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="4120" y="670" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Ready_di" bpmnElement="End_Ready"><dc:Bounds x="4342" y="622" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="4300" y="663" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AI_Start_di" bpmnElement="AI_Start"><dc:Bounds x="1072" y="192" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1030" y="233" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AI_GTIN_di" bpmnElement="AI_GTIN"><dc:Bounds x="1230" y="160" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AI_Normalize_di" bpmnElement="AI_Normalize"><dc:Bounds x="1410" y="160" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AI_Vector_di" bpmnElement="AI_Vector"><dc:Bounds x="1590" y="160" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AI_Rerank_di" bpmnElement="AI_Rerank"><dc:Bounds x="1770" y="160" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AI_Risk_di" bpmnElement="AI_Risk"><dc:Bounds x="1950" y="160" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AI_End_di" bpmnElement="AI_End"><dc:Bounds x="2182" y="192" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2140" y="233" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Store_Index_di" bpmnElement="Store_Index"><dc:Bounds x="1455" y="35" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1420" y="90" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ERP_Start_di" bpmnElement="ERP_Start"><dc:Bounds x="3622" y="1442" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="3580" y="1483" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ERP_Load_di" bpmnElement="ERP_Load"><dc:Bounds x="3930" y="1410" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ERP_Stock_di" bpmnElement="ERP_Stock"><dc:Bounds x="4110" y="1410" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ERP_Matrix_di" bpmnElement="ERP_Matrix"><dc:Bounds x="4290" y="1410" width="140" height="100" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ERP_End_di" bpmnElement="ERP_End"><dc:Bounds x="4522" y="1442" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="4480" y="1483" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1"><di:waypoint x="238" y="640" /><di:waypoint x="330" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2"><di:waypoint x="470" y="640" /><di:waypoint x="490" y="640" /><di:waypoint x="490" y="450" /><di:waypoint x="510" y="450" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3"><di:waypoint x="650" y="450" /><di:waypoint x="670" y="450" /><di:waypoint x="670" y="640" /><di:waypoint x="690" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4"><di:waypoint x="830" y="640" /><di:waypoint x="915" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5"><di:waypoint x="965" y="640" /><di:waypoint x="1050" y="640" /><bpmndi:BPMNLabel><dc:Bounds x="953" y="610" width="110" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6"><di:waypoint x="940" y="615" /><di:waypoint x="940" y="515" /><di:waypoint x="580" y="515" /><di:waypoint x="580" y="500" /><bpmndi:BPMNLabel><dc:Bounds x="945" y="545" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7"><di:waypoint x="1190" y="640" /><di:waypoint x="1275" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8"><di:waypoint x="1325" y="640" /><di:waypoint x="1410" y="640" /><bpmndi:BPMNLabel><dc:Bounds x="1328" y="592" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9"><di:waypoint x="1300" y="665" /><di:waypoint x="1300" y="945" /><di:waypoint x="1995" y="945" /><bpmndi:BPMNLabel><dc:Bounds x="1560" y="913" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10"><di:waypoint x="1300" y="665" /><di:waypoint x="1300" y="1075" /><di:waypoint x="2535" y="1075" /><bpmndi:BPMNLabel><dc:Bounds x="1560" y="1043" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11"><di:waypoint x="1550" y="640" /><di:waypoint x="1570" y="640" /><di:waypoint x="1570" y="815" /><di:waypoint x="1590" y="815" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12"><di:waypoint x="1730" y="815" /><di:waypoint x="1815" y="815" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13"><di:waypoint x="1840" y="790" /><di:waypoint x="1840" y="640" /><di:waypoint x="3255" y="640" /><bpmndi:BPMNLabel><dc:Bounds x="2020" y="618" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14"><di:waypoint x="1865" y="815" /><di:waypoint x="1930" y="815" /><di:waypoint x="1930" y="945" /><di:waypoint x="1995" y="945" /><bpmndi:BPMNLabel><dc:Bounds x="1936" y="845" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15"><di:waypoint x="2045" y="945" /><di:waypoint x="2130" y="945" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16"><di:waypoint x="2270" y="945" /><di:waypoint x="2355" y="945" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17"><di:waypoint x="2405" y="945" /><di:waypoint x="3280" y="945" /><di:waypoint x="3280" y="665" /><bpmndi:BPMNLabel><dc:Bounds x="2740" y="923" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18"><di:waypoint x="2380" y="970" /><di:waypoint x="2380" y="1075" /><di:waypoint x="2535" y="1075" /><bpmndi:BPMNLabel><dc:Bounds x="2420" y="1053" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19"><di:waypoint x="2585" y="1075" /><di:waypoint x="2670" y="1075" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20"><di:waypoint x="2810" y="1075" /><di:waypoint x="2895" y="1075" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_21_di" bpmnElement="Flow_21"><di:waypoint x="2945" y="1075" /><di:waypoint x="3280" y="1075" /><di:waypoint x="3280" y="665" /><bpmndi:BPMNLabel><dc:Bounds x="3100" y="1053" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_22_di" bpmnElement="Flow_22"><di:waypoint x="2920" y="1100" /><di:waypoint x="2920" y="1230" /><di:waypoint x="3030" y="1230" /><bpmndi:BPMNLabel><dc:Bounds x="2928" y="1160" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_23_di" bpmnElement="Flow_23"><di:waypoint x="3170" y="1230" /><di:waypoint x="3280" y="1230" /><di:waypoint x="3280" y="665" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_24_di" bpmnElement="Flow_24"><di:waypoint x="3305" y="640" /><di:waypoint x="3390" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_25_di" bpmnElement="Flow_25"><di:waypoint x="3530" y="640" /><di:waypoint x="3570" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_26_di" bpmnElement="Flow_26"><di:waypoint x="3710" y="640" /><di:waypoint x="3802" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_27_di" bpmnElement="Flow_27"><di:waypoint x="3838" y="640" /><di:waypoint x="3884" y="640" /><di:waypoint x="3884" y="450" /><di:waypoint x="3930" y="450" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_28_di" bpmnElement="Flow_28"><di:waypoint x="4070" y="450" /><di:waypoint x="4113" y="450" /><di:waypoint x="4113" y="640" /><di:waypoint x="4155" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_29_di" bpmnElement="Flow_29"><di:waypoint x="4205" y="640" /><di:waypoint x="4342" y="640" /><bpmndi:BPMNLabel><dc:Bounds x="4219" y="610" width="110" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_30_di" bpmnElement="Flow_30"><di:waypoint x="4180" y="665" /><di:waypoint x="4180" y="1010" /><di:waypoint x="2020" y="1010" /><di:waypoint x="2020" y="970" /><bpmndi:BPMNLabel><dc:Bounds x="4188" y="815" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_31_di" bpmnElement="Flow_31"><di:waypoint x="1108" y="210" /><di:waypoint x="1230" y="210" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_32_di" bpmnElement="Flow_32"><di:waypoint x="1370" y="210" /><di:waypoint x="1410" y="210" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_33_di" bpmnElement="Flow_33"><di:waypoint x="1550" y="210" /><di:waypoint x="1590" y="210" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_34_di" bpmnElement="Flow_34"><di:waypoint x="1730" y="210" /><di:waypoint x="1770" y="210" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_35_di" bpmnElement="Flow_35"><di:waypoint x="1910" y="210" /><di:waypoint x="1950" y="210" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_36_di" bpmnElement="Flow_36"><di:waypoint x="2090" y="210" /><di:waypoint x="2182" y="210" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_37_di" bpmnElement="Flow_37"><di:waypoint x="3658" y="1460" /><di:waypoint x="3930" y="1460" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_38_di" bpmnElement="Flow_38"><di:waypoint x="4070" y="1460" /><di:waypoint x="4110" y="1460" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_39_di" bpmnElement="Flow_39"><di:waypoint x="4250" y="1460" /><di:waypoint x="4290" y="1460" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_40_di" bpmnElement="Flow_40"><di:waypoint x="4430" y="1460" /><di:waypoint x="4522" y="1460" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_Request_di" bpmnElement="Msg_Request"><di:waypoint x="1090" y="590" /><di:waypoint x="1090" y="228" /><bpmndi:BPMNLabel><dc:Bounds x="970" y="430" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_Result_di" bpmnElement="Msg_Result"><di:waypoint x="2200" y="228" /><di:waypoint x="2200" y="330" /><di:waypoint x="1150" y="330" /><di:waypoint x="1150" y="590" /><bpmndi:BPMNLabel><dc:Bounds x="1158" y="430" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_To1C_di" bpmnElement="Msg_To1C"><di:waypoint x="3640" y="690" /><di:waypoint x="3640" y="1442" /><bpmndi:BPMNLabel><dc:Bounds x="3648" y="1046" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_ToPOS_di" bpmnElement="Msg_ToPOS"><di:waypoint x="4540" y="1478" /><di:waypoint x="4540" y="1610" /><bpmndi:BPMNLabel><dc:Bounds x="4548" y="1555" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Msg_POSAck_di" bpmnElement="Msg_POSAck"><di:waypoint x="3820" y="1610" /><di:waypoint x="3820" y="658" /><bpmndi:BPMNLabel><dc:Bounds x="3828" y="1114" width="110" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DOA_Export_di" bpmnElement="DOA_Export"><di:waypoint x="650" y="430" /><di:waypoint x="742" y="430" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DIA_Export_di" bpmnElement="DIA_Export"><di:waypoint x="760" y="455" /><di:waypoint x="760" y="590" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DIA_IndexGTIN_di" bpmnElement="DIA_IndexGTIN"><di:waypoint x="1455" y="60" /><di:waypoint x="1300" y="60" /><di:waypoint x="1300" y="160" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DIA_IndexVector_di" bpmnElement="DIA_IndexVector"><di:waypoint x="1505" y="60" /><di:waypoint x="1660" y="60" /><di:waypoint x="1660" y="160" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DOA_Labels_di" bpmnElement="DOA_Labels"><di:waypoint x="3460" y="590" /><di:waypoint x="3460" y="85" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

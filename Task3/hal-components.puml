@@ -1,0 +1,75 @@
+@startuml hal-components
+!pragma layout smetana
+!include <C4/C4_Component>
+
+AddElementTag("device", $bgColor="#8a8a8a", $borderColor="#5a5a5a", $legendText="устройство")
+AddElementTag("port", $bgColor="#ff7f0e", $borderColor="#b35900", $legendText="единый интерфейс (порт)")
+AddElementTag("plugin", $bgColor="#ffbb78", $fontColor="#000000", $borderColor="#b35900", $legendText="плагин вендора (адаптер)")
+
+LAYOUT_TOP_DOWN()
+
+title HAL / Payment Gateway: слой абстракции оборудования (C4 Components)
+
+Container(webpos, "Web POS", "PWA", "Вызывает только единые команды: fiscal.printReceipt, payment.pay, payment.refund")
+
+Container_Boundary(agent, "Edge Agent: HAL") {
+  Component(local_api, "Local API", "WebSocket 127.0.0.1, контракт v1/v2", "Токен устройства, версионирование, очередь команд к устройствам")
+  Component(dev_mgr, "Device Manager", "Kotlin", "Профиль магазина из Device Registry, выбор плагина, health-check устройств")
+  Component(loader, "Plugin Loader", "Kotlin", "Загрузка подписанных плагинов, доставленных MDM")
+  Component(fiscal_port, "IFiscalPrinter", "Интерфейс", "openShift, printReceipt, printRefund, xReport, zReport, fnStatus", $tags="port")
+  Component(pay_port, "IPaymentTerminal", "Интерфейс", "pay, refund, cancel, settlement, status", $tags="port")
+  Component(atol, "АТОЛ", "Драйвер ККТ АТОЛ", "", $tags="plugin")
+  Component(shtrih, "Штрих-М", "Драйвер Штрих-М", "", $tags="plugin")
+  Component(sber, "Сбер", "ARCUS-2 / UPOS", "", $tags="plugin")
+  Component(alfa, "Альфа-Банк", "Протокол банка", "", $tags="plugin")
+  Component(ingenico, "Ingenico", "ECR-протокол", "", $tags="plugin")
+  Component(verifone, "Verifone", "ECR-протокол", "", $tags="plugin")
+  Component(transport, "Transport", "USB / Bluetooth / TCP-IP", "Физический канал до устройства")
+}
+
+Container_Boundary(pg, "Payment Gateway (Yandex Cloud)") {
+  Component(pay_api, "Payment API", "REST", "Создание платежа, статус, возврат; идемпотентность по paymentId")
+  Component(routing, "Routing", "Правила", "Эквайрер и терминал по профилю магазина")
+  Component(profiles, "Terminal Profiles", "PostgreSQL", "Модель, плагин, эквайрер, MID/TID")
+  Component(sbp, "СБП-адаптер", "API банка", "Динамический QR")
+  Component(recon, "Reconciliation", "Batch", "Сверка с реестрами эквайреров и outbox касс")
+}
+
+Container_Ext(kkt, "ККТ", "АТОЛ / Штрих-М", "", $tags="device")
+Container_Ext(pinpad, "PIN-pad", "Любой поддержанный вендор", "", $tags="device")
+System_Ext(acq, "Эквайреры", "Сбер, Альфа и др.")
+Container(registry, "Device Registry", "Cloud", "Профили устройств магазина")
+System_Ext(mdm, "MDM", "Доставка плагинов")
+
+Rel(webpos, local_api, "Команды", "WebSocket")
+Rel(webpos, pay_api, "Создать платёж / подтвердить", "HTTPS")
+Rel(local_api, fiscal_port, "")
+Rel(local_api, pay_port, "")
+Rel(dev_mgr, fiscal_port, "Связывает с плагином")
+Rel(dev_mgr, pay_port, "Связывает с плагином")
+Rel(dev_mgr, registry, "Профиль магазина", "HTTPS")
+Rel(loader, dev_mgr, "Доступные плагины")
+Rel(mdm, loader, "Подписанные плагины")
+Rel(fiscal_port, atol, "")
+Rel(fiscal_port, shtrih, "")
+Rel(pay_port, sber, "")
+Rel(pay_port, alfa, "")
+Rel(pay_port, ingenico, "")
+Rel(pay_port, verifone, "")
+Rel(atol, transport, "")
+Rel(shtrih, transport, "")
+Rel(sber, transport, "")
+Rel(alfa, transport, "")
+Rel(ingenico, transport, "")
+Rel(verifone, transport, "")
+Rel(transport, kkt, "USB")
+Rel(transport, pinpad, "USB / BT / TCP")
+Rel(pinpad, acq, "Авторизация карты", "Канал банка")
+Rel(pay_api, routing, "")
+Rel(routing, profiles, "")
+Rel(pay_api, sbp, "QR-платёж")
+Rel(sbp, acq, "")
+Rel(recon, acq, "Реестры операций")
+
+SHOW_LEGEND()
+@enduml

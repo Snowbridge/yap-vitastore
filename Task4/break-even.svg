@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460" font-family="Segoe UI, Arial, sans-serif" font-size="13">
+<rect width="900" height="460" fill="#ffffff"/>
+<text x="450.0" y="28" text-anchor="middle" font-size="17" font-weight="bold">Накопленные затраты, 100 магазинов, млн руб. без НДС</text>
+<line x1="80" y1="400.0" x2="870" y2="400.0" stroke="#e5e5e5"/>
+<text x="72" y="404.0" text-anchor="end" fill="#555">0</text>
+<line x1="80" y1="356.2" x2="870" y2="356.2" stroke="#e5e5e5"/>
+<text x="72" y="360.2" text-anchor="end" fill="#555">20</text>
+<line x1="80" y1="312.5" x2="870" y2="312.5" stroke="#e5e5e5"/>
+<text x="72" y="316.5" text-anchor="end" fill="#555">40</text>
+<line x1="80" y1="268.8" x2="870" y2="268.8" stroke="#e5e5e5"/>
+<text x="72" y="272.8" text-anchor="end" fill="#555">60</text>
+<line x1="80" y1="225.0" x2="870" y2="225.0" stroke="#e5e5e5"/>
+<text x="72" y="229.0" text-anchor="end" fill="#555">80</text>
+<line x1="80" y1="181.2" x2="870" y2="181.2" stroke="#e5e5e5"/>
+<text x="72" y="185.2" text-anchor="end" fill="#555">100</text>
+<line x1="80" y1="137.5" x2="870" y2="137.5" stroke="#e5e5e5"/>
+<text x="72" y="141.5" text-anchor="end" fill="#555">120</text>
+<line x1="80" y1="93.8" x2="870" y2="93.8" stroke="#e5e5e5"/>
+<text x="72" y="97.8" text-anchor="end" fill="#555">140</text>
+<line x1="80" y1="50.0" x2="870" y2="50.0" stroke="#e5e5e5"/>
+<text x="72" y="54.0" text-anchor="end" fill="#555">160</text>
+<line x1="80.0" y1="50" x2="80.0" y2="400" stroke="#bbbbbb"/>
+<text x="80.0" y="418" text-anchor="middle" fill="#555">0</text>
+<line x1="211.7" y1="50" x2="211.7" y2="400" stroke="#f0f0f0"/>
+<text x="211.7" y="418" text-anchor="middle" fill="#555">6</text>
+<line x1="343.3" y1="50" x2="343.3" y2="400" stroke="#bbbbbb"/>
+<text x="343.3" y="418" text-anchor="middle" fill="#555">12</text>
+<line x1="475.0" y1="50" x2="475.0" y2="400" stroke="#f0f0f0"/>
+<text x="475.0" y="418" text-anchor="middle" fill="#555">18</text>
+<line x1="606.7" y1="50" x2="606.7" y2="400" stroke="#bbbbbb"/>
+<text x="606.7" y="418" text-anchor="middle" fill="#555">24</text>
+<line x1="738.3" y1="50" x2="738.3" y2="400" stroke="#f0f0f0"/>
+<text x="738.3" y="418" text-anchor="middle" fill="#555">30</text>
+<line x1="870.0" y1="50" x2="870.0" y2="400" stroke="#bbbbbb"/>
+<text x="870.0" y="418" text-anchor="middle" fill="#555">36</text>
+<text x="475.0" y="442" text-anchor="middle" fill="#333">Месяц от старта проекта</text>
+<rect x="80.0" y="50" width="131.7" height="350" fill="#fff4e0" opacity="0.6"/>
+<rect x="211.7" y="50" width="131.7" height="350" fill="#e8f2ff" opacity="0.6"/>
+<text x="145.8" y="66" text-anchor="middle" fill="#a06000">разработка, пилот</text>
+<text x="277.5" y="66" text-anchor="middle" fill="#2060a0">тираж</text>
+<polyline fill="none" stroke="#c0392b" stroke-width="3" points="80.0,400.0 101.9,390.6 123.9,381.1 145.8,371.7 167.8,362.2 189.7,352.8 211.7,343.3 233.6,333.9 255.6,324.4 277.5,315.0 299.4,305.5 321.4,296.1 343.3,286.6 365.3,277.2 387.2,267.7 409.2,258.3 431.1,248.8 453.1,239.4 475.0,229.9 496.9,220.5 518.9,211.0 540.8,201.6 562.8,192.1 584.7,182.7 606.7,173.2 628.6,163.8 650.6,154.3 672.5,144.9 694.4,135.5 716.4,126.0 738.3,116.6 760.3,107.1 782.2,97.7 804.2,88.2 826.1,78.8 848.1,69.3 870.0,59.9"/>
+<polyline fill="none" stroke="#1e8449" stroke-width="3" points="80.0,400.0 101.9,387.2 123.9,374.4 145.8,361.5 167.8,348.7 189.7,335.9 211.7,321.2 233.6,305.5 255.6,290.7 277.5,276.8 299.4,263.8 321.4,251.8 343.3,240.6 365.3,236.2 387.2,231.8 409.2,227.4 431.1,223.0 453.1,218.6 475.0,214.2 496.9,209.8 518.9,205.4 540.8,201.0 562.8,196.6 584.7,192.2 606.7,187.8 628.6,183.3 650.6,178.9 672.5,174.5 694.4,170.1 716.4,165.7 738.3,161.3 760.3,156.9 782.2,152.5 804.2,148.1 826.1,143.7 848.1,139.3 870.0,134.9"/>
+<line x1="543.5" y1="50" x2="543.5" y2="400" stroke="#333" stroke-dasharray="6,4"/>
+<circle cx="543.5" cy="200.4" r="6" fill="#333"/>
+<text x="555.5" y="226.4" font-weight="bold">Безубыточность: 21,1 мес.</text>
+<line x1="100" y1="90" x2="130" y2="90" stroke="#c0392b" stroke-width="3"/>
+<text x="138" y="94">As-Is: 155,5 млн за 3 года</text>
+<line x1="100" y1="112" x2="130" y2="112" stroke="#1e8449" stroke-width="3"/>
+<text x="138" y="116">To-Be: 121,2 млн за 3 года</text>
+<line x1="80" y1="400" x2="870" y2="400" stroke="#333"/>
+<line x1="80" y1="50" x2="80" y2="400" stroke="#333"/>
+</svg>
