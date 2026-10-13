@@ -1,0 +1,27 @@
+@startmindmap
+skinparam defaultFontName Arial
+skinparam shadowing false
+* Sourcing Strategy VitaStore
+**[#E0ECFF] SaaS (Buy)
+***[#E0ECFF] Cloud POS (Эвотор / Контур.Маркет / 1С:Касса)
+***[#E0ECFF] Payment Gateway + СБП
+***[#E0ECFF] ОФД
+***[#E0ECFF] Лояльность (Manzana / Mindbox / Loymax)
+***[#E0ECFF] 1С:ERP + 1С:ЗУП в облаке HQ
+***[#E0ECFF] Service Desk, MDM, ЭДО, инкассация
+**[#DFF5E3] PaaS / Build in Cloud (Yandex Cloud)
+***[#DFF5E3] Smart Fulfillment + Click & Collect
+***[#DFF5E3] Promo Engine
+***[#DFF5E3] SKU Matching (ML) + оркестратор онбординга
+***[#DFF5E3] Интеграционная шина (Kafka + API Gateway)
+***[#DFF5E3] BI (DataLens + ClickHouse)
+--[#FFF4D6] In-house / Edge (магазин, только физика)
+---[#FFF4D6] Хранение товара и физическая приёмка (ТСД)
+---[#FFF4D6] ККТ + ФН: печать кассового чека
+---[#FFF4D6] PIN-pad
+---[#FFF4D6] Принтер ценников / ESL
+---[#FFF4D6] Сейф и передача наличных
+---[#FFF4D6] Зона выдачи Click & Collect
+---[#FFF4D6] Планшет с офлайн-буфером
+---[#FFF4D6] Роутер + резервный LTE
+@endmindmap

@@ -1,0 +1,104 @@
+@startuml capability-map
+!pragma layout smetana
+title VitaStore — карта бизнес-возможностей L1/L2 (As-Is heatmap)\nфункции [S] выполняются локально в каждом из 500+ магазинов; в облаке — только HQ
+
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam rectangle {
+  RoundCorner 6
+  BorderColor #555555
+  BackgroundColor #FFFFFF
+  FontSize 12
+}
+skinparam rectangle<<L1>> {
+  BackgroundColor #F4F6F8
+  FontStyle bold
+  FontSize 14
+}
+skinparam rectangle<<red>> {
+  BackgroundColor #F8B4B4
+  BorderColor #B91C1C
+}
+skinparam rectangle<<green>> {
+  BackgroundColor #B7E4C7
+  BorderColor #15803D
+}
+hide stereotype
+
+rectangle "1. Продажи и обслуживание" <<L1>> as sales {
+  rectangle "1.1 Кассовое обслуживание (POS)\n[S]" <<red>> as pos
+  rectangle "1.2 Приём платежей\n[S]" <<red>> as pay
+  rectangle "1.3 Фискализация (54-ФЗ)\n[S]" as fiscal
+  rectangle "1.4 Возвраты и обмен\n[S]" as returns
+  rectangle "1.5 Выдача заказов\nClick & Collect\n[S]" <<green>> as cnc
+}
+
+rectangle "2. Маркетинг и лояльность" <<L1>> as mkt {
+  rectangle "2.1 Программа лояльности\n[S]" <<red>> as loyalty
+  rectangle "2.2 Промоакции\n(Promo Engine)\n[HQ]" <<green>> as promo
+  rectangle "2.3 Ценообразование\n[HQ]" as pricing
+  rectangle "2.4 Печать ценников\n[S]" <<red>> as labels
+}
+
+rectangle "3. Ассортимент и мастер-данные" <<L1>> as assort {
+  rectangle "3.1 Категорийный\nменеджмент\n[HQ]" as category
+  rectangle "3.2 Мастер-данные\nтоваров (MDM)\n[HQ]" as mdm
+  rectangle "3.3 Сопоставление SKU\nпри M&A\n[HQ]" <<red>> as sku
+}
+
+rectangle "4. Цепочка поставок и логистика" <<L1>> as scm {
+  rectangle "4.1 Омниканальная логистика\n(Smart Fulfillment)\n[HQ]" <<green>> as sf
+  rectangle "4.2 Закупки\n[HQ]" as purchase
+  rectangle "4.3 Приём товара от\nлокальных поставщиков\n[S]" <<red>> as receiving
+  rectangle "4.4 Учёт запасов\nмагазина\n[S]" <<red>> as stock
+  rectangle "4.5 Инвентаризация\n[S]" as inventory
+}
+
+rectangle "5. Операции магазина" <<L1>> as ops {
+  rectangle "5.1 Инкассация и\nуправление наличностью\n[S]" <<red>> as cash
+  rectangle "5.2 Управление сменами\n[S]" as shifts
+  rectangle "5.3 Управление торговым\nоборудованием\n[S]" <<red>> as devices
+}
+
+rectangle "6. Персонал" <<L1>> as hr {
+  rectangle "6.1 Кадровый учёт\n[HQ]" as hrrec
+  rectangle "6.2 Расчёт зарплаты\n[HQ]" as payroll
+  rectangle "6.3 Расчёт премий\nпродавцам\n[S/HQ]" <<red>> as bonus
+}
+
+rectangle "7. Финансы и корпоративный учёт" <<L1>> as fin {
+  rectangle "7.1 Корпоративный учёт ERP\n(SAP)\n[HQ]" <<red>> as erp
+  rectangle "7.2 Бухгалтерский и\nналоговый учёт\n[HQ]" as acc
+  rectangle "7.3 Управленческая\nотчётность\n[HQ]" as mgmt
+}
+
+rectangle "8. Развитие сети (M&A)" <<L1>> as mna {
+  rectangle "8.1 Due diligence\n[HQ]" as dd
+  rectangle "8.2 Онбординг\nмагазина\n[S/HQ]" <<red>> as onboard
+}
+
+rectangle "9. ИТ и данные" <<L1>> as it {
+  rectangle "9.1 Локальная ИТ-инфраструктура\nмагазина\n[S]" <<red>> as infra
+  rectangle "9.2 Интеграция и\nобмен данными\n[S/HQ]" <<red>> as integration
+  rectangle "9.3 ИТ-поддержка\nмагазинов\n[HQ]" <<red>> as support
+  rectangle "9.4 Аналитика и BI\n[HQ]" as bi
+}
+
+sales -[hidden]right- mkt
+mkt -[hidden]right- assort
+sales -[hidden]down- scm
+scm -[hidden]right- ops
+ops -[hidden]right- hr
+scm -[hidden]down- fin
+fin -[hidden]right- mna
+mna -[hidden]right- it
+
+legend bottom
+  |<#F8B4B4> | Дорогие / проблемные зоны (Commodity) |
+  |<#B7E4C7> | Уникальные конкурентные преимущества (Differentiators) |
+  |<#FFFFFF> | Без заливки — стандартные функции без выраженных проблем |
+  | [S] | выполняется локально в каждом магазине (x500+) |
+  | [HQ] | выполняется в центральном офисе (облако) |
+  | [S/HQ] | в каждом магазине и в HQ (вертикальное дублирование) |
+endlegend
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam rectangle {
+  RoundCorner 6
+}
+rectangle "HQ (облако)\nERP: закупки, HR, справочники, цены" as hq #DFF5E3
+rectangle "Магазин 1\nкасса + Local DB, лояльность,\nпремии, приёмка, ценники,\nинкассация, сервер" as s1 #F8B4B4
+rectangle "Магазин 2\nто же самое" as s2 #F8B4B4
+rectangle "Магазин 500+\nто же самое" as sn #F8B4B4
+s1 -right- s2 : горизонтальный\nдубль
+s2 -right- sn : ...
+hq -down- s1 : вертикальный\nдубль
+hq -down- s2
+hq -down- sn
+@enduml
